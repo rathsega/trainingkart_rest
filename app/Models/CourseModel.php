@@ -12,7 +12,7 @@ class CourseModel extends Model
     protected $returnType     = 'array';
     protected $useSoftDeletes = false;
 
-    protected $allowedFields = ['title', 'short_description', 'description', 'outcomes', 'language', 'category_id', 'sub_category_id', 'section', 'requirements', 'price', 'discount_flag', 'discounted_price', 'level', 'user_id', 'thumbnail', 'video_url', 'date_added', 'last_modified', 'course_type', 'is_top_course', 'is_top10_course', 'show_it_in_category', 'is_admin', 'status', 'course_overview_provider', 'meta_keywords', 'meta_description', 'is_free_course', 'multi_instructor', 'enable_drip_content', 'creator', 'faqs', 'expiry_period', 'broucher', 'slug', 'category_slug', 'sub_category_slug', 'course_duration_in_hours', 'course_duration_in_months', 'daily_class_duration_in_hours', 'slug_count', 'order', 'about', 'learn', 'future', 'growth', 'experience', 'template', 'banner_image', 'weekend_track_course_duration_in_months', 'weekend_track_daily_class_duration_in_hours', 'weekend_track_course_price', 'weekend_track_sessions_count', 'week_track_sessions_count', 'number_of_lectures']; // Fields that are allowed to be filled
+    protected $allowedFields = ['title', 'short_description', 'description', 'outcomes', 'language', 'category_id', 'sub_category_id', 'section', 'requirements', 'price', 'discount_flag', 'discounted_price', 'level', 'user_id', 'thumbnail', 'video_url', 'date_added', 'last_modified', 'course_type', 'is_top_course', 'is_top10_course', 'show_it_in_category', 'is_admin', 'status', 'course_overview_provider', 'meta_keywords', 'meta_description', 'is_free_course', 'multi_instructor', 'enable_drip_content', 'creator', 'faqs', 'expiry_period', 'broucher', 'slug', 'category_slug', 'sub_category_slug', 'course_duration_in_hours', 'course_duration_in_months', 'daily_class_duration_in_hours', 'slug_count', 'order', 'about', 'learn', 'future', 'growth', 'experience', 'template', 'banner_image', 'weekend_track_course_duration_in_months', 'weekend_track_daily_class_duration_in_hours', 'weekend_track_course_price', 'weekend_track_sessions_count', 'week_track_sessions_count', 'number_of_lectures', "batch_1", "batch_2", "career_growth"]; // Fields that are allowed to be filled
 
     protected $useTimestamps = false; // Set to true if you have created_at and updated_at fields
     protected $createdField  = 'created_at';
@@ -199,5 +199,82 @@ class CourseModel extends Model
             ->Where('status', 'active');
         $query = $builder->get();
         return $query->getResult();
+    }
+
+    public function getCourseById($ids){
+        $query = $this->orderBy('id', 'desc')
+            ->whereIn('id', $ids)
+            ->get();
+
+        // Get the result
+        return $query->getResult();
+    }
+
+    public function getAllCourses($title, $category_id, $price, $level, $sort_by, $limit, $offset){
+        // Start building the query
+        $sql = "SELECT *, course.id as course_id,  ratings_count.number_of_ratings,  one_rating_count, two_rating_count, three_rating_count,  four_rating_count, five_rating_count FROM " . $this->table . " LEFT JOIN 
+        ratings_count ON course.id = ratings_count.id  WHERE status = 'active' AND show_it_in_category = 1";
+        $bindings = [];
+
+        // Apply filters based on provided parameters
+        if (!empty($title)) {
+            $sql .= " AND title LIKE ?";
+            $bindings[] = '%' . $title . '%';
+        }
+
+        if (!empty($category_id)&&count($category_id) > 0) {
+            $sql .= " AND category_id in ?";
+            $bindings[] = $category_id;
+        }
+
+        if (!empty($price)) {
+            if ($price === 'free') {
+                $sql .= " AND is_free_course = ?";
+                $bindings[] = 1;
+            } elseif ($price === 'paid') {
+                $sql .= " AND is_free_course = ?";
+                $bindings[] = 0;
+            }
+        }
+
+        if (!empty($level)) {
+            $sql .= " AND level = ?";
+            $bindings[] = $level;
+        }
+
+        if (!empty($sort_by)) {
+            // Assuming sort_by value is something like 'title asc' or 'title desc'
+            $sql .= " ORDER BY course.order " . $sort_by;
+        }
+
+        /*if (!empty($limit)) {
+            $limit = intval($limit);
+            $offset = !empty($offset) ? intval($offset) : 0;
+            $sql .= " LIMIT ? OFFSET ?";
+            $bindings[] = $limit;
+            $bindings[] = $offset;
+        }*/
+
+        // Execute the query
+        $query = $this->db->query($sql, $bindings);
+
+        // Get the total count of matched records
+        $totalCountQuery = $this->db->query("SELECT FOUND_ROWS() AS total_count");
+        $totalCount = $totalCountQuery->getRow()->total_count;
+
+        if (!empty($limit)) {
+            $limit = intval($limit);
+            $offset = !empty($offset) ? intval($offset) : 0;
+            $sql .= " LIMIT ? OFFSET ?";
+            $bindings[] = $limit;
+            $bindings[] = $offset;
+        }
+
+        // Execute the query
+        $query = $this->db->query($sql, $bindings);
+        return [
+            'total_count' => $totalCount,
+            'data' => $query->getResult()
+        ];
     }
 }

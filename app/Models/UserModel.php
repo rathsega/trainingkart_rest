@@ -137,6 +137,7 @@ class UserModel extends Model
         users.first_name,
         users.last_name,
         users.image,
+        users.title,
         COUNT(enrol.id) AS num_enrollments
     FROM
         users

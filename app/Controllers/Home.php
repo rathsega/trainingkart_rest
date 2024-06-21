@@ -75,7 +75,7 @@ class Home extends ResourceController
                 'discounted_price' => $row->discounted_price,
                 'course_duration_in_hours' => $row->course_duration_in_hours,
                 'number_of_lectures' => $row->number_of_lectures,
-                'thumbnail' => $row->thumbnail,
+                'thumbnail' => $course["thumbnail"] = $this->get_course_thumbnail_url($row->course_id, "course_thumbnail", $row->last_modified ),
                 'slug' => $row->slug,
                 'instructor' => [
                     'first_name' => $row->instructor_first_name,
@@ -102,5 +102,24 @@ class Home extends ResourceController
         $userModel = model('App\Models\UserModel');
         $data =  $userModel->getAllInstructors();
         return $this->response->setJSON(array("data"=>$data));
+    }
+    public function get_course_thumbnail_url($course_id, $type, $last_modified)
+    {
+        // Course media placeholder is coming from the theme config file. Which has all the placehoder for different images. Choose like course type.
+        $course_media_placeholders = "assets/frontend/default-new/img/course_thumbnail_placeholder.jpg";
+        return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        if (file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.webp')) {
+            return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.webp';
+        } elseif (file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg')) {
+            return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        } elseif(file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg')) {
+
+            //resizeImage
+            //resizeImage(WRITEPATH . 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg', WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/', 400);
+
+            return 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        }else{
+            return $course_media_placeholders;
+        }
     }
 }

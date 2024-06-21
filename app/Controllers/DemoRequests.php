@@ -21,6 +21,7 @@ class DemoRequests extends ResourceController
             'email' => $json->email,
             'phone' => $json->phone,
             'course' => $json->course,
+            'type' => $json->type,
             'date' => time()
         ];
 

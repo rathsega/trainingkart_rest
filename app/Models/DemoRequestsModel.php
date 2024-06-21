@@ -12,7 +12,7 @@ class DemoRequestsModel extends Model
     protected $returnType     = 'array';
     protected $useSoftDeletes = false;
 
-    protected $allowedFields = ['name', 'email', 'phone', 'course', 'date']; // Fields that are allowed to be filled
+    protected $allowedFields = ['name', 'email', 'phone', 'course', 'date', 'type']; // Fields that are allowed to be filled
 
     protected $useTimestamps = false; // Set to true if you have created_at and updated_at fields
     protected $createdField  = 'created_at';
