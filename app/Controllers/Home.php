@@ -77,6 +77,9 @@ class Home extends ResourceController
                 'number_of_lectures' => $row->number_of_lectures,
                 'thumbnail' => $course["thumbnail"] = $this->get_course_thumbnail_url($row->course_id, "course_thumbnail", $row->last_modified ),
                 'slug' => $row->slug,
+                'slug_count' => $row->slug_count,
+                'category_slug' => $row->category_slug,
+                'sub_category_slug' => $row->sub_category_slug,
                 'instructor' => [
                     'first_name' => $row->instructor_first_name,
                     'last_name' => $row->instructor_last_name,

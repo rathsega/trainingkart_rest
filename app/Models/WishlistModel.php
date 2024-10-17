@@ -30,7 +30,32 @@ class WishlistModel extends Model
 
     public function getWishlistByUserId($userId)
     {
-        return $this->where('user_id', $userId)->findAll();
+        $db = \Config\Database::connect();
+
+        $sql = "SELECT w.id,
+            course.id as course_id, course.title, course.price, course.thumbnail, course.last_modified, course.discount_flag, course.discounted_price, course.is_free_course, course.slug,
+            users.first_name AS instructor_first_name, 
+            users.last_name AS instructor_last_name, 
+            users.image AS instructor_image 
+        FROM 
+            course 
+        RIGHT JOIN 
+            wishlist as w ON course.id = w.course_id 
+        RIGHT JOIN 
+            users ON (FIND_IN_SET(users.id, course.user_id)) 
+        WHERE 
+            course.status = 'active' and w.user_id = $userId 
+        GROUP BY
+            w.id
+        ORDER BY 
+            w.id desc;
+        ";
+
+        // Execute the query
+        $query = $db->query($sql);
+
+        // Fetch the result rows
+        return $query->getResult();
     }
     
     public function insertBatchIfNotExists($data)

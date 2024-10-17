@@ -34,6 +34,32 @@ class DemoRequests extends ResourceController
             return $this->fail('Failed to submit details.', 500);
         }
     }
+    public function requestCall()
+    {
+        $demoRequestsModel = model('App\Models\DemoRequestsModel');
+
+        // Get JSON request data
+        $json = $this->request->getJSON();
+
+        // Prepare data for insertion
+        $data = [
+            'name' => $json->name,
+            'email' => $json->email,
+            'phone' => $json->phone,
+            'course' => $json->course,
+            'type' => $json->type,
+            'date' => time()
+        ];
+
+        // Insert user data into the database
+        $inserted = $demoRequestsModel->insertDemoRequest($data);
+        // Return success response
+        if($inserted){
+            return $this->respondCreated(['message' => 'Thanks for submission.']);
+        }else{
+            return $this->fail('Failed to submit details.', 500);
+        }
+    }
 
     public function checkUserExists($email)
     {

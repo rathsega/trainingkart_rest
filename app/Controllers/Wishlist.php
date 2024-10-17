@@ -10,91 +10,73 @@ class Wishlist extends ResourceController
     protected $modelName = 'App\Models\WishlistModel';
     protected $format    = 'json';
 
-    public function create()
+    public function add()
     {
-        $data = $this->request->getPost();
+        $userId = $this->request->user_id;
+        $postData = $this->request->getJSON();
+
+        if (!$userId) {
+            return $this->response->setStatusCode(401)->setJSON(['message' => 'User not logged in']);
+        }
+
+        $data = [
+            'user_id' => $userId,
+            'course_id' => $postData->product_id
+        ];
+
         $this->model->insert($data);
 
-        return $this->respondCreated(['status' => 'Item added to wishlist']);
+        return $this->respondCreated(['message' => 'Product added to wishlist']);
     }
 
-    public function delete($id = null)
+    public function getWishlist()
     {
-        $this->model->delete($id);
-        return $this->respondDeleted(['status' => 'Item removed from wishlist']);
+        $userId = $this->request->user_id;
+
+        if (!$userId) {
+            return $this->response->setStatusCode(401)->setJSON(['message' => 'User not logged in']);
+        }
+
+        $model = new WishlistModel();
+        $wishlist = $model->getWishlistByUserId($userId);
+        foreach($wishlist as $key => $row){
+            $wishlist[$key]->thumbnail = $this->get_course_thumbnail_url($row->course_id, "course_thumbnail", $row->last_modified );
+        }
+
+        return $this->respond($wishlist);
     }
 
-    public function moveToCart()
+    public function remove($id)
     {
-        $data = $this->request->getPost();
-        // Logic to move item from wishlist to cart
-        return $this->respond(['status' => 'Item moved to cart']);
+        $userId = $this->request->user_id;
+
+        if (!$userId) {
+            return $this->response->setStatusCode(401)->setJSON(['message' => 'User not logged in']);
+        }
+
+        $model = new WishlistModel();
+        $model->delete($id);
+
+        return $this->respondDeleted(['message' => 'Product removed from wishlist']);
     }
 
-    public function manageWhenUserLogin(){
-        /*$request_data = $this->request->getJSON();
-        //get existed wishlist items
-        $backend_wishlist = $this->model->getExistedWishListItems($request_data->user_id);
-        $backend_wishlist_ids = [];
-        foreach($backend_wishlist as $item){
-            $backend_wishlist_ids[] = (int)$item->course_id;
+    public function get_course_thumbnail_url($course_id, $type, $last_modified)
+    {
+        // Course media placeholder is coming from the theme config file. Which has all the placehoder for different images. Choose like course type.
+        $course_media_placeholders = "assets/frontend/default-new/img/course_thumbnail_placeholder.jpg";
+        return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        if (file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.webp')) {
+            return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.webp';
+        } elseif (file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg')) {
+            return 'uploads/thumbnails/course_thumbnails/optimized/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        } elseif(file_exists(WRITEPATH . 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg')) {
+
+            //resizeImage
+            //resizeImage(WRITEPATH . 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg', WRITEPATH . 'uploads/thumbnails/course_thumbnails/optimized/', 400);
+
+            return 'uploads/thumbnails/course_thumbnails/' . $type . '_' . 'default-new' . '_' . $course_id.$last_modified . '.jpg';
+        }else{
+            return $course_media_placeholders;
         }
-        log_message('info', 'CORS Filter is running before1.' . json_encode(array("backend_wishlist" => $backend_wishlist)));
-        $frontend_wishlist = $request_data->courseIds;
-        log_message('info', 'CORS Filter is running before1.' . json_encode(array("frontend_wishlist" => $frontend_wishlist)));
-
-        $wishlist_items = array_values(array_unique(array_merge($frontend_wishlist, $backend_wishlist_ids)));
-        log_message('info', 'CORS Filter is running before1.' . json_encode(array("wishlist_items" => $wishlist_items)));
-
-        $this->model->deleteAllWishlistItemsByUserId($request_data->user_id);
-
-        $data =[];
-        foreach($wishlist_items as $item){
-            $data[] = array('user_id'=>$request_data->user_id, 'course_id'=> $item);
-        }
-        log_message('info', 'CORS Filter is running before1.' . json_encode(array("batch" => $data)));
-        $inserted = $this->model->insertBatchRecords($data);
-        log_message('info', 'CORS Filter is running before1.' . json_encode(array("inserted" => $inserted)));
-
-        if($inserted){
-            return $this->respond($wishlist_items, 200);
-        }*/
-
-        $courseIds = $this->request->getPost('courseIds'); // Assuming the course_ids are passed as a POST parameter
-        $userId = $this->request->getPost('user_id'); // Assuming the user_id is passed as a POST parameter
-
-        // Load the model
-        $wishlistModel = new WishlistModel();
-        
-        // Get existing wishlist entries for the user
-        $existingWishlist = $wishlistModel->getWishlistByUserId($userId);
-
-        // Extract course IDs from existing wishlist
-        $existingCourseIds = array_column($existingWishlist, 'course_id');
-
-        // Calculate the unique course IDs that need to be inserted
-        $uniqueCourseIdsToInsert = array_diff($courseIds, $existingCourseIds);
-
-        // Prepare the data for batch insert
-        $dataToInsert = [];
-        foreach ($uniqueCourseIdsToInsert as $courseId) {
-            $dataToInsert[] = [
-                'course_id' => $courseId,
-                'user_id' => $userId,
-                'datetime' => date('Y-m-d H:i:s')
-            ];
-        }
-
-        // Insert the unique courses into the wishlist table
-        if (!empty($dataToInsert)) {
-            $wishlistModel->insertBatch($dataToInsert);
-        }
-
-        // Return the updated wishlist course IDs
-        $updatedWishlist = $wishlistModel->getWishlistByUserId($userId);
-        $updatedCourseIds = array_column($updatedWishlist, 'course_id');
-
-        return $this->respond(['course_ids' => $updatedCourseIds]);
-
     }
 }

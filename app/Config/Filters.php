@@ -70,7 +70,7 @@ class Filters extends BaseFilters
     public array $globals = [
         'before' => [
             'cors' => [],
-            'jwt' => ['except' => ['auth/*', 'Register/*', 'Home/*', 'Blogs/*', "file/*", "Course/*" ,'course/*', 'demoRequests/*', 'contact/*', 'wishlist/*', 'jobs','jobs/*']]
+            'jwt' => ['except' => ['auth/*', 'Register/*', 'Home/*', 'Blogs/*', "file/*", "Course/*" ,'course/*', 'demoRequests/*', 'contact/*', 'jobs','jobs/*']]
 
             // 'honeypot',
             // 'csrf',

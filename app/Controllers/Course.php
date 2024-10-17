@@ -6,10 +6,6 @@ namespace App\Controllers;
 use CodeIgniter\RESTful\ResourceController;
 
 use App\Models\CourseModel;
-use App\Models\SectionModel;
-use App\Models\ChapterModel;
-use App\Models\LessonModel;
-use App\Models\EnrolModel;
 use App\Models\CompanyModel;
 use App\Models\CategoryModel;
 //use App\Models\UserModel;
@@ -32,38 +28,15 @@ class Course extends ResourceController
         }
 
         $courseModel = new CourseModel();
-        $sectionModel = new SectionModel();
-        $chapterModel = new ChapterModel();
-        $lessonModel = new LessonModel();
-        $enrolModel = new EnrolModel();
-        $companyModel = new CompanyModel();
-        //$userModel = new UserModel();
-
 
         // Fetch the course by slug
-        $course = $courseModel->getCourseBySlug($slug);
+        $course = $courseModel->getCourseDetailsBySlug($slug);
         if (!$course) {
             return $this->response->setStatusCode(404, 'Course not found');
         }
         $course = (array)$course;
-        // Fetch sections related to the course
-        $sections = $sectionModel->where('course_id', $course['id'])->orderBy('order', 'ASC')->findAll();
-        foreach ($sections as &$section) {
-            // Fetch chapters related to the section
-            $chapters = $chapterModel->where('section_id', $section['id'])->orderBy('order', 'ASC')->findAll();
-            foreach ($chapters as &$chapter) {
-                // Fetch lessons related to the chapter
-                $lessons = $lessonModel->where('chapter_id', $chapter['id'])->orderBy('order', 'ASC')->findAll();
-                $chapter['lessons'] = $lessons;
-            }
-            // Fetch lessons related to the section directly (without chapter)
-            $sectionLessons = $lessonModel->where('section_id', $section['id'])->where('chapter_id', null)->orderBy('order', 'ASC')->findAll();
-            $section['chapters'] = $chapters;
-            $section['lessons'] = $sectionLessons;
-        }
 
-        $course['sections'] = $sections;
-        //$course["number_of_students_enrolled"] = $enrolModel->getEnrolmentCountByCourse($course['id'])->count;
+
 
         if ($course["instructor_image"] && file_exists(WRITEPATH . 'uploads/avatar/' . $course["instructor_image"])) {
             $mimeType = mime_content_type(WRITEPATH . 'uploads/avatar/' . $course["instructor_image"]);
@@ -75,47 +48,105 @@ class Course extends ResourceController
             $course['mime_type'] = $mimeType;
         }
 
-        //Growth
-        $career_growth = json_decode($course["career_growth"]);
-        foreach ($career_growth as $key => $growth) {
-            $growth->company = $growth->company ? $growth->company : [];
-            if ($growth->company) {
-                $company_details = $companyModel->getCompaniesByIds($growth->company);
-                $career_growth[$key]->company = $company_details;
-            } else {
-                $career_growth[$key]->company = [];
-            }
-        }
-        $course["career_growth"] = json_encode($career_growth);
+
 
         //Thumbnail
         $course["thumbnail"] = $this->get_course_thumbnail_url($course["course_id"], "course_thumbnail", $course["last_modified"]);
-        //Fetch instructor details
-        /*$instructor = $userModel->getInstructorDetailsByCourseId($course["id"]);
-        $course['instructor_details'] = [
-            'instructor' => [
-                'first_name' => $instructor['first_name'],
-                'last_name' => $instructor['last_name'],
-                'title' => $instructor['user_title'],
-                'biography' => $instructor['biography'],
-                'skills' => $instructor['skills'],
-                'image' => $instructor['image'],
-            ],
-            'ratings' => [
-                'number_of_students_enrolled' => $instructor['number_of_students_enrolled'],
-                'number_of_ratings' => $instructor['number_of_ratings'],
-                'ratings' => [
-                    'one_rating_count' => $instructor['one_rating_count'],
-                    'two_rating_count' => $instructor['two_rating_count'],
-                    'three_rating_count' => $instructor['three_rating_count'],
-                    'four_rating_count' => $instructor['four_rating_count'],
-                    'five_rating_count' => $instructor['five_rating_count'],
-                ],
-                'enrol_count' => $instructor['enrol_count'],
-            ],
-        ];*/
 
         // Return course details
+        return $this->respond($course, 200);
+    }
+
+    public function getCourseDetailsOfRequiredData($course_id="", $element="")
+    {
+        $courseModel = new CourseModel();
+        $course = $courseModel->getRequiredData($course_id, $element);
+        // Return course details
+        return $this->respond($course, 200);
+        if ($element == 'career_growth') {
+            //Growth
+            $companyModel = new CompanyModel();
+            $course = $courseModel->getRequiredData($course_id, $element);
+            $career_growth = json_decode($course->career_growth);
+            foreach ($career_growth as $key => $growth) {
+                $growth->company = $growth->company ? $growth->company : [];
+                if ($growth->company) {
+                    $company_details = $companyModel->getCompaniesByIds($growth->company);
+                    $career_growth[$key]->company = $company_details;
+                } else {
+                    $career_growth[$key]->company = [];
+                }
+            }
+            $course->career_growth = json_encode($career_growth);
+            // Return course details
+            return $this->respond($course, 200);
+        }else {
+            //Growth
+            $course = $courseModel->getRequiredData($course_id, $element);
+            // Return course details
+            return $this->respond($course, 200);
+        }
+    }
+
+    public function getCourseCurriculum($course_id)
+    {
+        $courseModel = new CourseModel();
+        //get course curriculum
+        $course_curriculum_result = $courseModel->getCourseCurriculum($course_id);
+        // Initialize the result array
+        $course_structure = [];
+
+        // Process each row
+        foreach ($course_curriculum_result as $row) {
+            // Add section if not already present
+            if (!isset($course_structure[$row['section_id']])) {
+                $course_structure[$row['section_id']] = [
+                    'section_id' => $row['section_id'],
+                    'title' => $row['section_title'],
+                    'order' => $row['section_order'],
+                    'chapters' => [],  // To hold chapters if they exist
+                    'lessons' => [],   // To hold lessons if no chapters exist
+                    'start_date' => $row['start_date'],
+                    'end_date' => $row['end_date']
+                ];
+            }
+
+            // If there's a chapter, add chapter under section
+            if (!empty($row['chapter_id'])) {
+                if (!isset($course_structure[$row['section_id']]['chapters'][$row['chapter_id']])) {
+                    $course_structure[$row['section_id']]['chapters'][$row['chapter_id']] = [
+                        'chapter_id' => $row['chapter_id'],
+                        'title' => $row['chapter_title'],
+                        'order' => $row['chapter_order'],
+                        'lessons' => [] // Lessons under this chapter
+                    ];
+                }
+
+                // Add lesson to chapter if it's linked to a chapter
+                if (!empty($row['lesson_id']) && $row['lesson_chapter_id'] == $row['chapter_id']) {
+                    $course_structure[$row['section_id']]['chapters'][$row['chapter_id']]['lessons'][] = [
+                        'lesson_id' => $row['lesson_id'],
+                        'title' => $row['lesson_title'],
+                        'duration' => $row['duration'],
+                        'video_type' => $row['video_type'],
+                        'video_url' => $row['video_url']
+                    ];
+                }
+            }
+
+            // If the lesson belongs directly to a section (no chapter), add it under 'lessons' at the section level
+            if (!empty($row['lesson_id']) && empty($row['chapter_id'])) {
+                $course_structure[$row['section_id']]['lessons'][] = [
+                    'lesson_id' => $row['lesson_id'],
+                    'title' => $row['lesson_title'],
+                    'duration' => $row['duration'],
+                    'video_type' => $row['video_type'],
+                    'video_url' => $row['video_url']
+                ];
+            }
+        }
+
+        $course['curriculum'] = $course_structure;
         return $this->respond($course, 200);
     }
 
@@ -204,13 +235,18 @@ class Course extends ResourceController
                 'discounted_price' => $row->discounted_price,
                 'course_duration_in_hours' => $row->course_duration_in_hours,
                 'number_of_lectures' => $row->number_of_lectures,
-                'thumbnail' => $row->thumbnail,
+                'thumbnail' => $this->get_course_thumbnail_url($row->course_id, "course_thumbnail", $row->last_modified ),
                 'slug' => $row->slug,
 
                 'rating_count' => [
                     'average_ratings' => $this->getAverageRating($row),
                     'number_of_ratings' => $row->number_of_ratings
-                ]
+                ],
+                'instructor' => [
+                    'first_name' => isset($row->instructor_first_name) ? $row->instructor_first_name : null,
+                    'last_name' => isset($row->instructor_last_name) ? $row->instructor_last_name : null,
+                    'image' => isset($row->instructor_image) ? $row->instructor_image : null,
+                ],
             ];
             $courses[] = $courseDetails;
         }
@@ -265,8 +301,9 @@ class Course extends ResourceController
                 ->groupEnd()
                 ->findAll();
 
-
-            $result[$category['name']] = $courses;
+            if (count($courses) > 0) {
+                $result[$category['name']] = $courses;
+            }
         }
 
         $topCourse = $courseModel->select('id, title, slug, category_slug, sub_category_slug')
@@ -279,9 +316,20 @@ class Course extends ResourceController
             ->where('status', 'active')
             ->where('is_top10_course', 1)
             ->findAll(10);
-        $result['Top Courses'] = $topCourse;
-        $result['Top 10 Courses'] = $top10Courses;
+        if (count($topCourse) > 0) {
+            $result['Top Courses'] = $topCourse;
+        }
+        if (count($top10Courses) > 0) {
+            $result['Trending Courses'] = $top10Courses;
+        }
 
         return $this->respond($result);
+    }
+
+    public function getRelatedCourses($id, $limit, $offset){
+        $courseModel = new CourseModel();
+        $results = $courseModel->getRelatedCourses($id, $limit, $offset);
+        $data = $this->composeCourseModel($results);
+        return $this->respond($data);
     }
 }
